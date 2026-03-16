@@ -1,0 +1,52 @@
+FROM fedora:42
+
+# ── COPR ROS2 Kilted repository ───────────────────────────────────────────────
+RUN dnf install -y \
+    dnf-plugins-core \
+    'dnf5-command(copr)' \
+    && dnf copr enable -y tavie/ros2 \
+    && dnf clean all
+
+# ── ROS2 runtime + common dependencies ───────────────────────────────────────
+RUN dnf install -y \
+    ros-kilted-ros-base \
+    ros-kilted-rmw-cyclonedds-cpp \
+    python3-colcon-common-extensions \
+    spdlog-devel \
+    lttng-ust \
+    python3-typing-extensions \
+    python3-packaging \
+    python3-numpy \
+    console-bridge-devel \
+    && dnf clean all
+
+# ── Dev tools ─────────────────────────────────────────────────────────────────
+RUN dnf install -y \
+    cmake \
+    gcc-c++ \
+    git \
+    make \
+    patch \
+    python3-mypy \
+    python3-pip \
+    python3-pytest \
+    python3-pytest-repeat \
+    python3-pytest-rerunfailures \
+    python3-rosdep \
+    python3-setuptools \
+    python3-vcstool \
+    wget \
+    && python3 -m pip install -U --user \
+        flake8-blind-except==0.1.1 \
+        flake8-class-newline \
+        flake8-deprecated \
+    && dnf clean all
+
+# ── SSH / X11 forwarding ──────────────────────────────────────────────────────
+RUN dnf install -y openssh-server && dnf clean all && \
+    sed -i 's/^#\?X11Forwarding.*/X11Forwarding yes/' /etc/ssh/sshd_config && \
+    sed -i 's/^#\?X11DisplayOffset.*/X11DisplayOffset 10/' /etc/ssh/sshd_config && \
+    sed -i 's/^#\?X11UseLocalhost.*/X11UseLocalhost yes/' /etc/ssh/sshd_config
+
+# Source ROS2 in every bash session
+RUN echo "source /usr/lib64/ros2-kilted/setup.bash" >> /etc/bashrc

@@ -6,7 +6,7 @@ set -e
 RTSP_PORT="${RTSP_PORT:-8554}"
 
 echo "[entrypoint] Sourcing ROS2 environment …"
-source /opt/ros/kilted/setup.bash
+source /usr/lib64/ros2-kilted/setup.bash
 source /ros2_ws/install/setup.bash
 
 echo "[entrypoint] Starting MediaMTX on port ${RTSP_PORT} …"

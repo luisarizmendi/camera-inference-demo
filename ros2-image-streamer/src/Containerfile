@@ -1,29 +1,15 @@
-FROM ubuntu:noble
+FROM quay.io/luisarizmendi/ros2-fedora-base:latest
 
 LABEL description="ROS2 Image topic → RTSP/WebRTC streamer via MediaMTX"
 
-# ── ROS2 Kilted repository ────────────────────────────────────────────────────
-RUN apt-get update && apt-get install -y \
-    curl \
-    gnupg2 \
-    lsb-release \
-    && curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
-       -o /usr/share/keyrings/ros-archive-keyring.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] \
-       http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" \
-       > /etc/apt/sources.list.d/ros2.list \
-    && rm -rf /var/lib/apt/lists/*
-
-# ── ROS2 + dependencies ───────────────────────────────────────────────────────
-RUN apt-get update && apt-get install -y \
-    ros-kilted-ros-base \
+# ── Extra dependencies (streamer-specific) ────────────────────────────────────
+RUN dnf install -y \
     ros-kilted-cv-bridge \
-    python3-colcon-common-extensions \
     python3-opencv \
-    python3-numpy \
     ffmpeg \
+    curl \
     tar \
-    && rm -rf /var/lib/apt/lists/*
+    && dnf clean all
 
 # ── MediaMTX ──────────────────────────────────────────────────────────────────
 ARG MEDIAMTX_VERSION=v1.9.3
@@ -40,7 +26,7 @@ WORKDIR /ros2_ws/src/image_streamer
 COPY ros2_pkg/ ./
 
 WORKDIR /ros2_ws
-RUN /bin/bash -c "source /opt/ros/kilted/setup.bash && colcon build --symlink-install"
+RUN /bin/bash -c "source /usr/lib64/ros2-kilted/setup.bash && colcon build --symlink-install"
 
 # ── Entrypoint ────────────────────────────────────────────────────────────────
 COPY entrypoint.sh /entrypoint.sh

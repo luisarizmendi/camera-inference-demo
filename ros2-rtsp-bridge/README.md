@@ -1,16 +1,16 @@
-# rtsp-bridge
+# ros2-rtsp-bridge
 
 Servicio contenerizado que actúa como **puente entre un stream RTSP y un topic de ROS2**.
 Captura frames de una cámara IP/RTSP y los publica como `sensor_msgs/Image`.
 
-Está diseñado para ejecutarse **uno por cámara**, en paralelo con otros contenedores del mismo tipo.
+Construido sobre `ros2-fedora-base:latest`. Está diseñado para ejecutarse **uno por cámara**.
 
 ---
 
 ## Estructura
 
 ```
-rtsp-bridge/
+ros2-rtsp-bridge/
 ├── README.md
 └── src/
     ├── Containerfile
@@ -43,20 +43,23 @@ rtsp-bridge/
 | `RECONNECT_RETRIES` |             | `0`                 | Intentos máximos de reconexión; `0` = infinito |
 | `QOS_DEPTH`         |             | `1`                 | Profundidad del historial QoS del publisher |
 | `VERBOSE`           |             | `false`             | Log de cada frame: `1`/`true`/`yes` |
-| `ROS_DOMAIN_ID`     |             | `0`                 | ID de dominio DDS (variable estándar de ROS2) |
+| `ROS_DOMAIN_ID`     |             | `0`                 | ID de dominio DDS de ROS2 |
 
 ---
 
-## Construir la imagen
+## Construir
 
 ```bash
-cd rtsp-bridge/src
-podman build -t rtsp-bridge:latest .
+# Primero construir la imagen base (si no está ya)
+cd ros2-fedora-base/src
+podman build -t ros2-fedora-base:latest .
+
+# Luego construir el servicio
+cd ros2-rtsp-bridge/src
+podman build -t ros2-rtsp-bridge:latest .
 ```
 
----
-
-## Ejecutar una cámara
+## Ejecutar
 
 ```bash
 podman run --rm --network host \
@@ -66,12 +69,7 @@ podman run --rm --network host \
   -e TARGET_FPS="15" \
   -e IMAGE_WIDTH="1280" \
   -e IMAGE_HEIGHT="720" \
-  -e JPEG_QUALITY="80" \
-  rtsp-bridge:latest
+  ros2-rtsp-bridge:latest
 ```
 
-## Múltiples cámaras con Docker Compose
-
-Añade un servicio por cámara en el `docker-compose.yml` del proyecto raíz, todos usando la misma imagen `rtsp-bridge:latest` y diferente configuración por variables de entorno.
-
-> **Nota**: se usa `network_mode: host` para que el descubrimiento DDS de ROS2 funcione correctamente.
+> Usa `network_mode: host` para que el DDS discovery de ROS2 funcione correctamente.
