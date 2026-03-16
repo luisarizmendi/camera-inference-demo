@@ -35,10 +35,14 @@ ros2-image-streamer/
 |---------------------|---------------------|-------------|
 | `ROS_TOPIC`         | `/camera/image_raw` | ROS2 image topic to subscribe to |
 | `RTSP_HOST`         | `127.0.0.1`         | Host where MediaMTX is running |
-| `RTSP_PORT`         | `8554`              | RTSP port |
+| `RTSP_PORT`         | `8554`              | RTSP TCP listener port |
+| `RTSP_PORT_RTP`     | `8000`              | RTSP UDP/RTP listener port |
+| `RTSP_PORT_RTCP`    | `8001`              | RTSP UDP/RTCP listener port |
 | `RTSP_PORT_HLS`     | `8888`              | HLS web player port |
 | `RTSP_PORT_WEBRTC`  | `8889`              | WebRTC web player port |
 | `RTSP_PORT_ICE_UDP` | `8189`              | WebRTC ICE UDP mux port |
+| `RTSP_PORT_SRT`     | `8890`              | SRT port |
+| `RTSP_PORT_RTMP`    | `1935`              | RTMP port |
 | `RTSP_NAME`         | `stream`            | Stream path name |
 | `VIDEO_CODEC`       | `libx264`           | FFmpeg video codec |
 | `VIDEO_BITRATE`     | `1000k`             | Output bitrate |
@@ -89,16 +93,20 @@ The `entrypoint.sh` reads the four port variables at startup and rewrites
 `mediamtx.yml` before launching MediaMTX, so no config file changes are needed —
 just pass different values via environment variables.
 
-Example — `camera-gateway-rtsp` already occupies 8554/8888/8889/8189:
+Example — `camera-gateway-rtsp` already occupies 8554/8000/8001/8888/8889/8189:
 
 ```bash
 podman run --rm --network host \
   -e ROS_TOPIC="/camera/front/image_raw" \
   -e RTSP_NAME="front" \
   -e RTSP_PORT=8654 \
+  -e RTSP_PORT_RTP=8292 \
+  -e RTSP_PORT_RTCP=8293 \
   -e RTSP_PORT_HLS=8988 \
   -e RTSP_PORT_WEBRTC=8989 \
   -e RTSP_PORT_ICE_UDP=8289 \
+  -e RTSP_PORT_SRT=8290 \
+  -e RTSP_PORT_RTMP=8291 \
   -e MTX_WEBRTCADDITIONALHOSTS="192.168.1.41" \
   ros2-image-streamer:latest
 ```

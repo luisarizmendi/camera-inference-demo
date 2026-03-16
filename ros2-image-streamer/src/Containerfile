@@ -2,11 +2,19 @@ FROM ros2-fedora-base:latest
 
 LABEL description="ROS2 Image topic -> RTSP/WebRTC streamer via MediaMTX"
 
+# ── RPM Fusion — required for full H264/libx264 support in ffmpeg ─────────────
+RUN dnf install -y \
+    "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm" \
+    "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm" \
+    && dnf -y upgrade \
+    && dnf clean all
+
 # ── Streamer-specific dependencies ────────────────────────────────────────────
 RUN dnf install -y \
     ros-kilted-cv-bridge \
     python3-opencv \
     ffmpeg \
+    ffmpeg-libs \
     curl \
     tar \
     && dnf clean all
@@ -35,9 +43,13 @@ RUN chmod +x /entrypoint.sh
 # ── Environment defaults ──────────────────────────────────────────────────────
 ENV RTSP_HOST=127.0.0.1
 ENV RTSP_PORT=8554
+ENV RTSP_PORT_RTP=8000
+ENV RTSP_PORT_RTCP=8001
 ENV RTSP_PORT_HLS=8888
 ENV RTSP_PORT_WEBRTC=8889
 ENV RTSP_PORT_ICE_UDP=8189
+ENV RTSP_PORT_SRT=8890
+ENV RTSP_PORT_RTMP=1935
 ENV RTSP_NAME=stream
 ENV VIDEO_CODEC=libx264
 ENV VIDEO_BITRATE=1000k
