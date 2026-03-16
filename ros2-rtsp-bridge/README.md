@@ -57,8 +57,8 @@ podman run --rm --network host \
   -e ROS_TOPIC="/camera/front/image_raw" \
   -e CAMERA_NAME="camera_front" \
   -e TARGET_FPS="15" \
-  -e IMAGE_WIDTH="720" \
-  -e IMAGE_HEIGHT="480" \
+  -e IMAGE_WIDTH="640" \
+  -e IMAGE_HEIGHT="360" \
   ros2-rtsp-bridge:latest
 ```
 
