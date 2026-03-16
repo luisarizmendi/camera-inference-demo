@@ -53,7 +53,7 @@ cd ros2-rtsp-bridge/src  && podman build -t ros2-rtsp-bridge:latest .
 
 ```bash
 podman run --rm --network host \
-  -e RTSP_URL="rtsp://admin:1234@192.168.1.100:554/stream1" \
+  -e RTSP_URL="rtsp://admin:1234@192.168.1.41:8554/stream" \
   -e ROS_TOPIC="/camera/front/image_raw" \
   -e CAMERA_NAME="camera_front" \
   -e TARGET_FPS="15" \
