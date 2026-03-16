@@ -14,7 +14,7 @@ setup(
     zip_safe=True,
     maintainer='Maintainer',
     maintainer_email='maintainer@example.com',
-    description='ROS2 Image topic → RTSP/WebRTC streamer via MediaMTX',
+    description='ROS2 Image topic to RTSP/WebRTC streamer via MediaMTX',
     license='Apache-2.0',
     entry_points={
         'console_scripts': [

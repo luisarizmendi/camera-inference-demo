@@ -1,16 +1,15 @@
 # ros2-image-streamer
 
-Servicio contenerizado que **suscribe a un topic ROS2 de imágenes** y las retransmite vía MediaMTX como:
+Containerized service that subscribes to a ROS2 image topic and re-publishes
+it via MediaMTX as:
 
-- **RTSP**   → `rtsp://<host>:8554/<RTSP_NAME>`
-- **HLS**    → `http://<host>:8888/<RTSP_NAME>`
-- **WebRTC** → `http://<host>:8889/<RTSP_NAME>`
+- **RTSP**   -> `rtsp://<host>:<RTSP_PORT>/<RTSP_NAME>`
+- **HLS**    -> `http://<host>:<RTSP_PORT_HLS>/<RTSP_NAME>`
+- **WebRTC** -> `http://<host>:<RTSP_PORT_WEBRTC>/<RTSP_NAME>`
 
-Construido sobre `ros2-fedora-base:latest`.
+Built on `ros2-fedora-base:latest`.
 
----
-
-## Estructura
+## Structure
 
 ```
 ros2-image-streamer/
@@ -29,39 +28,39 @@ ros2-image-streamer/
             └── image_streamer_node.py
 ```
 
----
+## Environment variables
 
-## Variables de entorno
+| Variable            | Default             | Description |
+|---------------------|---------------------|-------------|
+| `ROS_TOPIC`         | `/camera/image_raw` | ROS2 image topic to subscribe to |
+| `RTSP_HOST`         | `127.0.0.1`         | Host where MediaMTX is running |
+| `RTSP_PORT`         | `8554`              | RTSP port |
+| `RTSP_PORT_HLS`     | `8888`              | HLS web player port |
+| `RTSP_PORT_WEBRTC`  | `8889`              | WebRTC web player port |
+| `RTSP_PORT_ICE_UDP` | `8189`              | WebRTC ICE UDP mux port |
+| `RTSP_NAME`         | `stream`            | Stream path name |
+| `VIDEO_CODEC`       | `libx264`           | FFmpeg video codec |
+| `VIDEO_BITRATE`     | `1000k`             | Output bitrate |
+| `VIDEO_PRESET`      | `ultrafast`         | x264 preset |
+| `VIDEO_TUNE`        | `zerolatency`       | x264 tune |
+| `TARGET_FPS`        | `30`                | Output stream FPS |
+| `IMAGE_WIDTH`       | `0`                 | Resize width; `0` = disabled |
+| `IMAGE_HEIGHT`      | `0`                 | Resize height; `0` = disabled |
+| `QOS_DEPTH`         | `1`                 | Subscriber QoS history depth |
+| `VERBOSE`           | `false`             | Log every frame |
+| `ROS_DOMAIN_ID`     | `0`                 | ROS2 DDS domain ID |
 
-| Variable        | Por defecto         | Descripción |
-|-----------------|---------------------|-------------|
-| `ROS_TOPIC`     | `/camera/image_raw` | Topic ROS2 del que consumir imágenes |
-| `RTSP_HOST`     | `127.0.0.1`         | Host al que publicar en MediaMTX |
-| `RTSP_PORT`     | `8554`              | Puerto RTSP |
-| `RTSP_NAME`     | `stream`            | Path del stream |
-| `VIDEO_CODEC`   | `libx264`           | Codec FFmpeg |
-| `VIDEO_BITRATE` | `1000k`             | Bitrate de salida |
-| `VIDEO_PRESET`  | `ultrafast`         | Preset x264 |
-| `VIDEO_TUNE`    | `zerolatency`       | Tune x264 |
-| `TARGET_FPS`    | `30`                | FPS del stream de salida |
-| `IMAGE_WIDTH`   | `0`                 | Redimensionado; `0` = sin cambio |
-| `IMAGE_HEIGHT`  | `0`                 | Redimensionado; `0` = sin cambio |
-| `QOS_DEPTH`     | `1`                 | Profundidad QoS del subscriber |
-| `VERBOSE`       | `false`             | Log por frame |
-| `ROS_DOMAIN_ID` | `0`                 | ID de dominio DDS |
+For WebRTC from a browser on the same LAN, also pass:
+`-e MTX_WEBRTCADDITIONALHOSTS=<LAN_IP_of_host>`
 
-Para WebRTC desde la red local añade: `-e MTX_WEBRTCADDITIONALHOSTS=<IP_LAN>`
-
----
-
-## Construir
+## Build
 
 ```bash
-cd ros2-fedora-base/src    && podman build -t ros2-fedora-base:latest .
-cd ros2-image-streamer/src && podman build -t ros2-image-streamer:latest .
+cd ros2-fedora-base/src     && podman build -t ros2-fedora-base:latest .
+cd ros2-image-streamer/src  && podman build -t ros2-image-streamer:latest .
 ```
 
-## Ejecutar
+## Run — default ports
 
 ```bash
 podman run --rm --network host \
@@ -71,8 +70,45 @@ podman run --rm --network host \
   ros2-image-streamer:latest
 ```
 
-| Protocolo | URL |
-|-----------|-----|
-| RTSP      | `rtsp://localhost:8554/front` |
-| HLS/web   | `http://localhost:8888/front` |
-| WebRTC    | `http://localhost:8889/front` |
+Streams will be available at:
+
+| Protocol | URL |
+|----------|-----|
+| RTSP     | `rtsp://localhost:8554/front` |
+| HLS/web  | `http://localhost:8888/front` |
+| WebRTC   | `http://localhost:8889/front` |
+
+## Port conflicts — running alongside another MediaMTX service
+
+If another service that embeds MediaMTX (e.g. `camera-gateway-rtsp`) is already
+running on the same host and using the default ports, you must assign a different
+set of ports to this container.
+
+The `entrypoint.sh` reads the four port variables at startup and rewrites
+`mediamtx.yml` before launching MediaMTX, so no config file changes are needed —
+just pass different values via environment variables and map them with `-p`.
+
+Example — `camera-gateway-rtsp` already occupies 8554/8888/8889/8189:
+
+```bash
+podman run --rm --network host \
+  -e ROS_TOPIC="/camera/front/image_raw" \
+  -e RTSP_NAME="front" \
+  -e RTSP_PORT=8654 \
+  -e RTSP_PORT_HLS=8988 \
+  -e RTSP_PORT_WEBRTC=8989 \
+  -e RTSP_PORT_ICE_UDP=8289 \
+  -e MTX_WEBRTCADDITIONALHOSTS="192.168.1.41" \
+  ros2-image-streamer:latest
+```
+
+Streams will then be available at:
+
+| Protocol | URL |
+|----------|-----|
+| RTSP     | `rtsp://localhost:8654/front` |
+| HLS/web  | `http://localhost:8988/front` |
+| WebRTC   | `http://localhost:8989/front` |
+
+If you run **multiple** `ros2-image-streamer` instances on the same host,
+each one needs its own unique set of four ports.

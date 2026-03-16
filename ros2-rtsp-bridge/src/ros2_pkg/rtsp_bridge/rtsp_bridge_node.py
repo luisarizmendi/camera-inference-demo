@@ -1,35 +1,26 @@
 """
 RTSP Bridge Node
 
-Captura frames de un stream RTSP y los publica como sensor_msgs/Image
-en un topic de ROS2 configurable.
+Captures frames from an RTSP stream and publishes them as sensor_msgs/Image
+messages on a configurable ROS2 topic.
 
-Variables de entorno
---------------------
-RTSP_URL            URL del stream RTSP (obligatoria)
-                    Ejemplo: rtsp://user:pass@192.168.1.10:554/stream1
-ROS_TOPIC           Topic donde se publican las imágenes
-                    (por defecto: /camera/image_raw)
-CAMERA_NAME         Nombre lógico de la cámara; se usa como frame_id y
-                    nombre del nodo ROS2 (por defecto: rtsp_bridge)
-TARGET_FPS          Frecuencia de publicación en fps (por defecto: 10)
-MAX_FRAMES          Frames máximos antes de parar; 0 = sin límite
-                    (por defecto: 0)
-IMAGE_WIDTH         Ancho de redimensionado en píxeles; 0 = sin cambio
-                    (por defecto: 0)
-IMAGE_HEIGHT        Alto de redimensionado en píxeles; 0 = sin cambio
-                    (por defecto: 0)
-JPEG_QUALITY        Calidad JPEG para recodificar antes de publicar (1-100);
-                    0 = sin recodificar (por defecto: 0)
-RECONNECT_DELAY     Segundos de espera entre reconexiones (por defecto: 5)
-RECONNECT_RETRIES   Intentos máximos de reconexión; 0 = infinito
-                    (por defecto: 0)
-QOS_DEPTH           Profundidad del historial QoS del publisher
-                    (por defecto: 1)
-VERBOSE             Log de cada frame publicado: 1/true/yes
-                    (por defecto: false)
-ROS_DOMAIN_ID       ID de dominio DDS de ROS2 (variable estándar de ROS2;
-                    por defecto: 0)
+Environment variables
+---------------------
+RTSP_URL            RTSP stream URL (required)
+                    e.g. rtsp://user:pass@192.168.1.10:554/stream1
+ROS_TOPIC           Topic to publish images on (default: /camera/image_raw)
+CAMERA_NAME         Logical camera name; used as frame_id and ROS2 node name
+                    (default: rtsp_bridge)
+TARGET_FPS          Publishing rate in frames per second (default: 10)
+MAX_FRAMES          Max frames before shutting down; 0 = unlimited (default: 0)
+IMAGE_WIDTH         Resize width in pixels; 0 = no resize (default: 0)
+IMAGE_HEIGHT        Resize height in pixels; 0 = no resize (default: 0)
+JPEG_QUALITY        JPEG re-encode quality 1-100; 0 = disabled (default: 0)
+RECONNECT_DELAY     Seconds to wait before reconnecting (default: 5)
+RECONNECT_RETRIES   Max reconnection attempts; 0 = unlimited (default: 0)
+QOS_DEPTH           Publisher QoS history depth (default: 1)
+VERBOSE             Log every published frame: 1/true/yes (default: false)
+ROS_DOMAIN_ID       ROS2 DDS domain ID (default: 0)
 """
 
 import os
@@ -43,7 +34,6 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 from sensor_msgs.msg import Image
-from std_msgs.msg import Header
 from cv_bridge import CvBridge
 
 
@@ -78,21 +68,21 @@ class RtspBridgeNode(Node):
         super().__init__(node_name)
 
         # ── Config ────────────────────────────────────────────────────────────
-        self.rtsp_url: str       = os.environ.get("RTSP_URL", "")
-        self.topic: str          = os.environ.get("ROS_TOPIC", "/camera/image_raw")
-        self.camera_name: str    = camera_name
-        self.target_fps: float   = _env_float("TARGET_FPS", 10.0)
-        self.max_frames: int     = _env_int("MAX_FRAMES", 0)
-        self.img_width: int      = _env_int("IMAGE_WIDTH", 0)
-        self.img_height: int     = _env_int("IMAGE_HEIGHT", 0)
-        self.jpeg_quality: int   = _env_int("JPEG_QUALITY", 0)
+        self.rtsp_url: str      = os.environ.get("RTSP_URL", "")
+        self.topic: str         = os.environ.get("ROS_TOPIC", "/camera/image_raw")
+        self.camera_name: str   = camera_name
+        self.target_fps: float  = _env_float("TARGET_FPS", 10.0)
+        self.max_frames: int    = _env_int("MAX_FRAMES", 0)
+        self.img_width: int     = _env_int("IMAGE_WIDTH", 0)
+        self.img_height: int    = _env_int("IMAGE_HEIGHT", 0)
+        self.jpeg_quality: int  = _env_int("JPEG_QUALITY", 0)
         self.reconnect_delay: float  = _env_float("RECONNECT_DELAY", 5.0)
         self.reconnect_retries: int  = _env_int("RECONNECT_RETRIES", 0)
-        self.qos_depth: int      = _env_int("QOS_DEPTH", 1)
-        self.verbose: bool       = _env_bool("VERBOSE")
+        self.qos_depth: int     = _env_int("QOS_DEPTH", 1)
+        self.verbose: bool      = _env_bool("VERBOSE")
 
         if not self.rtsp_url:
-            self.get_logger().fatal("RTSP_URL no está definido. Saliendo.")
+            self.get_logger().fatal("RTSP_URL is not set. Shutting down.")
             raise RuntimeError("RTSP_URL not set")
 
         # ── QoS ───────────────────────────────────────────────────────────────
@@ -111,9 +101,9 @@ class RtspBridgeNode(Node):
             f"\n  RTSP URL  : {self.rtsp_url}"
             f"\n  Topic     : {self.topic}"
             f"\n  FPS       : {self.target_fps}"
-            f"\n  Max frames: {self.max_frames or 'sin límite'}"
-            f"\n  Resize    : {self.img_width}x{self.img_height} (0 = sin cambio)"
-            f"\n  JPEG enc. : {'calidad=' + str(self.jpeg_quality) if self.jpeg_quality else 'desactivado'}"
+            f"\n  Max frames: {self.max_frames or 'unlimited'}"
+            f"\n  Resize    : {self.img_width}x{self.img_height} (0 = disabled)"
+            f"\n  JPEG enc. : {'quality=' + str(self.jpeg_quality) if self.jpeg_quality else 'disabled'}"
         )
 
         self._thread = threading.Thread(target=self._capture_loop, daemon=True)
@@ -122,7 +112,7 @@ class RtspBridgeNode(Node):
     # ── Capture loop ──────────────────────────────────────────────────────────
 
     def _open_capture(self) -> Optional[cv2.VideoCapture]:
-        self.get_logger().info(f"Abriendo stream: {self.rtsp_url}")
+        self.get_logger().info(f"Opening stream: {self.rtsp_url}")
         cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
         return cap if cap.isOpened() else None
 
@@ -136,25 +126,25 @@ class RtspBridgeNode(Node):
             if cap is None:
                 attempts += 1
                 self.get_logger().warning(
-                    f"No se pudo abrir el stream (intento {attempts}). "
-                    f"Reintentando en {self.reconnect_delay}s …"
+                    f"Could not open stream (attempt {attempts}). "
+                    f"Retrying in {self.reconnect_delay}s ..."
                 )
                 if self.reconnect_retries and attempts >= self.reconnect_retries:
-                    self.get_logger().fatal("Máximo de reintentos alcanzado. Deteniendo.")
+                    self.get_logger().fatal("Max reconnection attempts reached. Stopping.")
                     rclpy.shutdown()
                     return
                 time.sleep(self.reconnect_delay)
                 continue
 
             attempts = 0
-            self.get_logger().info("Stream abierto correctamente.")
+            self.get_logger().info("Stream opened successfully.")
 
             while not self._stop.is_set():
                 t0 = time.monotonic()
 
                 ret, frame = cap.read()
                 if not ret:
-                    self.get_logger().warning("Lectura de frame fallida — stream caído.")
+                    self.get_logger().warning("Frame read failed — stream may have dropped.")
                     break
 
                 if self.img_width > 0 and self.img_height > 0:
@@ -171,11 +161,11 @@ class RtspBridgeNode(Node):
                 self._frame_count += 1
 
                 if self.verbose:
-                    self.get_logger().info(f"Frame #{self._frame_count} publicado")
+                    self.get_logger().info(f"Frame #{self._frame_count} published")
 
                 if self.max_frames and self._frame_count >= self.max_frames:
                     self.get_logger().info(
-                        f"MAX_FRAMES={self.max_frames} alcanzado. Deteniendo."
+                        f"MAX_FRAMES={self.max_frames} reached. Shutting down."
                     )
                     cap.release()
                     rclpy.shutdown()
@@ -186,7 +176,7 @@ class RtspBridgeNode(Node):
                     time.sleep(sleep)
 
             cap.release()
-            self.get_logger().warning(f"Reconectando en {self.reconnect_delay}s …")
+            self.get_logger().warning(f"Reconnecting in {self.reconnect_delay}s ...")
             time.sleep(self.reconnect_delay)
 
     def _publish(self, frame: np.ndarray):
@@ -196,7 +186,7 @@ class RtspBridgeNode(Node):
             msg.header.frame_id = self.camera_name
             self._pub.publish(msg)
         except Exception as exc:
-            self.get_logger().error(f"Error publicando frame: {exc}")
+            self.get_logger().error(f"Failed to publish frame: {exc}")
 
     def destroy_node(self):
         self._stop.set()
@@ -211,7 +201,7 @@ def main(args=None):
         node = RtspBridgeNode()
         rclpy.spin(node)
     except RuntimeError as exc:
-        print(f"[rtsp_bridge] Error fatal: {exc}")
+        print(f"[rtsp_bridge] Fatal error: {exc}")
     finally:
         rclpy.shutdown()
 

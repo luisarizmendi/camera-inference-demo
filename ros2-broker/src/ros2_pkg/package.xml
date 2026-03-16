@@ -3,7 +3,7 @@
 <package format="3">
   <n>image_broker</n>
   <version>0.1.0</version>
-  <description>ROS2 Image Stream Broker — monitorización de topics y diagnósticos</description>
+  <description>ROS2 Image Stream Broker — topic monitoring and diagnostics</description>
   <maintainer email="maintainer@example.com">Maintainer</maintainer>
   <license>Apache-2.0</license>
 

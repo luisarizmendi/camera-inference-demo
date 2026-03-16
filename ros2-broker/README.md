@@ -1,13 +1,12 @@
 # ros2-broker
 
-Servicio contenerizado que actúa como **nodo central del grafo ROS2**.
-Monitoriza los topics de imagen publicados por los contenedores `ros2-rtsp-bridge` y expone diagnósticos de estado.
+Containerized service that acts as the **central ROS2 node** for the camera streaming system.
+It subscribes to all configured image topics, monitors their liveness, and publishes
+a consolidated diagnostic report on `/broker/camera_status`.
 
-Construido sobre `ros2-fedora-base:latest`. Se levanta una única instancia.
+Built on `ros2-fedora-base:latest`. Run a single instance per ROS2 domain.
 
----
-
-## Estructura
+## Structure
 
 ```
 ros2-broker/
@@ -25,41 +24,49 @@ ros2-broker/
             └── image_broker_node.py
 ```
 
----
+## Environment variables
 
-## Variables de entorno
+| Variable                | Default        | Description |
+|-------------------------|----------------|-------------|
+| `BROKER_NODE_NAME`      | `image_broker` | ROS2 node name |
+| `CAMERA_TOPICS`         | _(empty)_      | Comma-separated list of topics to monitor |
+| `HEALTH_CHECK_INTERVAL` | `5`            | Seconds between health evaluations |
+| `STALE_TIMEOUT`         | `10`           | Seconds without frames before marking a topic STALE |
+| `REPUBLISH`             | `false`        | Re-publish each topic on `/broker/<topic>/image` |
+| `QOS_DEPTH`             | `5`            | QoS history depth |
+| `VERBOSE`               | `false`        | Log every received frame |
+| `ROS_DOMAIN_ID`         | `0`            | ROS2 DDS domain ID |
 
-| Variable                | Por defecto      | Descripción |
-|-------------------------|------------------|-------------|
-| `BROKER_NODE_NAME`      | `image_broker`   | Nombre del nodo ROS2 |
-| `CAMERA_TOPICS`         | _(vacío)_        | Topics a monitorizar, separados por coma |
-| `HEALTH_CHECK_INTERVAL` | `5`              | Segundos entre evaluaciones de estado |
-| `STALE_TIMEOUT`         | `10`             | Segundos sin frames para marcar como STALE |
-| `REPUBLISH`             | `false`          | Re-publica cada topic en `/broker/<topic>/image` |
-| `QOS_DEPTH`             | `5`              | Profundidad del historial QoS |
-| `VERBOSE`               | `false`          | Log por cada frame recibido |
-| `ROS_DOMAIN_ID`         | `0`              | ID de dominio DDS de ROS2 |
-
----
-
-## Construir
+## Build
 
 ```bash
 cd ros2-fedora-base/src && podman build -t ros2-fedora-base:latest .
 cd ros2-broker/src      && podman build -t ros2-broker:latest .
 ```
 
-## Ejecutar
+## Run
 
 ```bash
 podman run --rm --network host \
   -e CAMERA_TOPICS="/camera/front/image_raw,/camera/rear/image_raw" \
   -e STALE_TIMEOUT="10" \
+  -e HEALTH_CHECK_INTERVAL="5" \
   ros2-broker:latest
 ```
 
-## Diagnósticos
+## Diagnostics topic
+
+The broker publishes `diagnostic_msgs/DiagnosticArray` on `/broker/camera_status`.
 
 ```bash
 ros2 topic echo /broker/camera_status
 ```
+
+Each entry reports:
+
+| Field           | Description |
+|-----------------|-------------|
+| `level`         | `0` = OK · `2` = STALE |
+| `total_frames`  | Frames received since startup |
+| `fps_estimate`  | Estimated FPS over the last 2 seconds |
+| `last_seen_ago` | Time since the last frame |

@@ -1,13 +1,11 @@
 # ros2-rtsp-bridge
 
-Servicio contenerizado que actúa como **puente entre un stream RTSP y un topic de ROS2**.
-Captura frames de una cámara IP/RTSP y los publica como `sensor_msgs/Image`.
+Containerized service that acts as a **bridge between an RTSP stream and a ROS2 topic**.
+Captures frames from an IP/RTSP camera and publishes them as `sensor_msgs/Image` messages.
 
-Construido sobre `ros2-fedora-base:latest`. Está diseñado para ejecutarse **uno por cámara**.
+Built on `ros2-fedora-base:latest`. Designed to run **one instance per camera**.
 
----
-
-## Estructura
+## Structure
 
 ```
 ros2-rtsp-bridge/
@@ -25,45 +23,39 @@ ros2-rtsp-bridge/
             └── rtsp_bridge_node.py
 ```
 
----
+## Environment variables
 
-## Variables de entorno
+| Variable            | Required | Default             | Description |
+|---------------------|:--------:|---------------------|-------------|
+| `RTSP_URL`          | ✅        | —                   | Full RTSP stream URL |
+| `ROS_TOPIC`         |          | `/camera/image_raw` | ROS2 topic to publish frames on |
+| `CAMERA_NAME`       |          | `rtsp_bridge`       | Logical name; used as `frame_id` and node name |
+| `TARGET_FPS`        |          | `10`                | Publishing rate in frames per second |
+| `MAX_FRAMES`        |          | `0`                 | Max frames before stopping; `0` = unlimited |
+| `IMAGE_WIDTH`       |          | `0`                 | Resize width in pixels; `0` = no resize |
+| `IMAGE_HEIGHT`      |          | `0`                 | Resize height in pixels; `0` = no resize |
+| `JPEG_QUALITY`      |          | `0`                 | JPEG re-encode quality (1-100); `0` = disabled |
+| `RECONNECT_DELAY`   |          | `5`                 | Seconds between reconnection attempts |
+| `RECONNECT_RETRIES` |          | `0`                 | Max reconnection attempts; `0` = unlimited |
+| `QOS_DEPTH`         |          | `1`                 | Publisher QoS history depth |
+| `VERBOSE`           |          | `false`             | Log every published frame: `1`/`true`/`yes` |
+| `ROS_DOMAIN_ID`     |          | `0`                 | ROS2 DDS domain ID |
 
-| Variable            | Obligatoria | Por defecto         | Descripción |
-|---------------------|:-----------:|---------------------|-------------|
-| `RTSP_URL`          | ✅           | —                   | URL completa del stream RTSP |
-| `ROS_TOPIC`         |             | `/camera/image_raw` | Topic ROS2 donde se publican los frames |
-| `CAMERA_NAME`       |             | `rtsp_bridge`       | Nombre lógico; se usa como `frame_id` y nombre de nodo |
-| `TARGET_FPS`        |             | `10`                | Frecuencia de publicación en fps |
-| `MAX_FRAMES`        |             | `0`                 | Frames máximos antes de parar; `0` = sin límite |
-| `IMAGE_WIDTH`       |             | `0`                 | Ancho de redimensionado en píxeles; `0` = sin cambio |
-| `IMAGE_HEIGHT`      |             | `0`                 | Alto de redimensionado en píxeles; `0` = sin cambio |
-| `JPEG_QUALITY`      |             | `0`                 | Calidad JPEG al recodificar (1-100); `0` = sin recodificar |
-| `RECONNECT_DELAY`   |             | `5`                 | Segundos de espera entre reconexiones |
-| `RECONNECT_RETRIES` |             | `0`                 | Intentos máximos de reconexión; `0` = infinito |
-| `QOS_DEPTH`         |             | `1`                 | Profundidad del historial QoS del publisher |
-| `VERBOSE`           |             | `false`             | Log de cada frame: `1`/`true`/`yes` |
-| `ROS_DOMAIN_ID`     |             | `0`                 | ID de dominio DDS de ROS2 |
-
----
-
-## Construir
+## Build
 
 ```bash
-# Primero construir la imagen base (si no está ya)
-cd ros2-fedora-base/src
-podman build -t ros2-fedora-base:latest .
+# Build the base image first if not already done
+cd ros2-fedora-base/src && podman build -t ros2-fedora-base:latest .
 
-# Luego construir el servicio
 cd ros2-rtsp-bridge/src
 podman build -t ros2-rtsp-bridge:latest .
 ```
 
-## Ejecutar
+## Run
 
 ```bash
 podman run --rm --network host \
-  -e RTSP_URL="rtsp://admin:1234@192.168.1.100:554/stream1" \
+  -e RTSP_URL="rtsp://admin:1234@192.168.1.41:8554/stream" \
   -e ROS_TOPIC="/camera/front/image_raw" \
   -e CAMERA_NAME="camera_front" \
   -e TARGET_FPS="15" \
@@ -72,4 +64,4 @@ podman run --rm --network host \
   ros2-rtsp-bridge:latest
 ```
 
-> Usa `network_mode: host` para que el DDS discovery de ROS2 funcione correctamente.
+> Use `--network host` so ROS2 DDS discovery works correctly across containers.

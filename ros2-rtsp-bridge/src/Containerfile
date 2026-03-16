@@ -1,6 +1,6 @@
 FROM ros2-fedora-base:latest
 
-# ── Extra dependencies (bridge-specific) ─────────────────────────────────────
+# ── Bridge-specific dependencies ──────────────────────────────────────────────
 RUN dnf install -y \
     ros-kilted-cv-bridge \
     python3-opencv \

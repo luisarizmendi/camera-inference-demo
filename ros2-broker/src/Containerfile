@@ -1,6 +1,6 @@
-FROM quay.io/luisarizmendi/ros2-fedora-base:latest
+FROM ros2-fedora-base:latest
 
-# ros-kilted-rmw-cyclonedds-cpp and all common deps already in base image
+# All required dependencies are already in the base image
 
 # ── ROS2 package ──────────────────────────────────────────────────────────────
 WORKDIR /ros2_ws/src/image_broker

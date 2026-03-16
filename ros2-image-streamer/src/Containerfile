@@ -1,8 +1,8 @@
-FROM quay.io/luisarizmendi/ros2-fedora-base:latest
+FROM ros2-fedora-base:latest
 
-LABEL description="ROS2 Image topic → RTSP/WebRTC streamer via MediaMTX"
+LABEL description="ROS2 Image topic -> RTSP/WebRTC streamer via MediaMTX"
 
-# ── Extra dependencies (streamer-specific) ────────────────────────────────────
+# ── Streamer-specific dependencies ────────────────────────────────────────────
 RUN dnf install -y \
     ros-kilted-cv-bridge \
     python3-opencv \
@@ -35,6 +35,9 @@ RUN chmod +x /entrypoint.sh
 # ── Environment defaults ──────────────────────────────────────────────────────
 ENV RTSP_HOST=127.0.0.1
 ENV RTSP_PORT=8554
+ENV RTSP_PORT_HLS=8888
+ENV RTSP_PORT_WEBRTC=8889
+ENV RTSP_PORT_ICE_UDP=8189
 ENV RTSP_NAME=stream
 ENV VIDEO_CODEC=libx264
 ENV VIDEO_BITRATE=1000k
@@ -46,11 +49,11 @@ ENV IMAGE_HEIGHT=0
 ENV ROS_TOPIC=/camera/image_raw
 ENV ROS_DOMAIN_ID=0
 
-# ── Ports ─────────────────────────────────────────────────────────────────────
-# 8554  → RTSP
-# 8888  → HLS  (web player)
-# 8889  → WebRTC (web player)
-# 8189  → WebRTC ICE UDP mux
+# ── Default ports (override with -p when another MediaMTX is on the same host) ─
+# 8554  -> RTSP
+# 8888  -> HLS  (web player)
+# 8889  -> WebRTC (web player)
+# 8189  -> WebRTC ICE UDP mux
 EXPOSE 8554
 EXPOSE 8888
 EXPOSE 8889

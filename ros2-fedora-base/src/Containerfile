@@ -42,7 +42,7 @@ RUN dnf install -y \
         flake8-deprecated \
     && dnf clean all
 
-# ── SSH / X11 forwarding ──────────────────────────────────────────────────────
+# ── SSH server + X11 forwarding ───────────────────────────────────────────────
 RUN dnf install -y openssh-server && dnf clean all && \
     sed -i 's/^#\?X11Forwarding.*/X11Forwarding yes/' /etc/ssh/sshd_config && \
     sed -i 's/^#\?X11DisplayOffset.*/X11DisplayOffset 10/' /etc/ssh/sshd_config && \

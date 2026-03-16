@@ -1,40 +1,39 @@
 """
 Image Streamer Node
 
-Se suscribe a un topic ROS2 de imágenes (sensor_msgs/Image) y las reenvía
-a MediaMTX via FFmpeg (pipe rawvideo → RTSP), haciéndolas disponibles como:
-  - RTSP  → rtsp://<host>:8554/<RTSP_NAME>
-  - HLS   → http://<host>:8888/<RTSP_NAME>
-  - WebRTC → http://<host>:8889/<RTSP_NAME>
+Subscribes to a ROS2 image topic (sensor_msgs/Image) and forwards frames
+to MediaMTX via FFmpeg (rawvideo pipe -> RTSP), making them available as:
+  - RTSP   -> rtsp://<RTSP_HOST>:<RTSP_PORT>/<RTSP_NAME>
+  - HLS    -> http://<RTSP_HOST>:<RTSP_PORT_HLS>/<RTSP_NAME>
+  - WebRTC -> http://<RTSP_HOST>:<RTSP_PORT_WEBRTC>/<RTSP_NAME>
 
-El nodo escribe los frames crudos en un pipe hacia un subproceso ffmpeg,
-siguiendo el mismo patrón que el camera-gateway-rtsp de referencia.
+The node writes raw frames into a pipe to an FFmpeg subprocess which pushes
+the encoded stream to the local MediaMTX instance.
 
-Variables de entorno
---------------------
-ROS_TOPIC        Topic ROS2 del que consumir imágenes
-                 (por defecto: /camera/image_raw)
-RTSP_HOST        Host al que publicar en MediaMTX (por defecto: 127.0.0.1)
-RTSP_PORT        Puerto RTSP de MediaMTX (por defecto: 8554)
-RTSP_NAME        Nombre del path RTSP (por defecto: stream)
-VIDEO_CODEC      Codec FFmpeg de vídeo (por defecto: libx264)
-VIDEO_BITRATE    Bitrate de vídeo (por defecto: 1000k)
-VIDEO_PRESET     Preset x264 (por defecto: ultrafast)
-VIDEO_TUNE       Tune x264 (por defecto: zerolatency)
-TARGET_FPS       FPS del stream de salida (por defecto: 30)
-IMAGE_WIDTH      Ancho de redimensionado antes de publicar; 0 = sin cambio
-                 (por defecto: 0)
-IMAGE_HEIGHT     Alto de redimensionado antes de publicar; 0 = sin cambio
-                 (por defecto: 0)
-QOS_DEPTH        Profundidad del historial QoS del subscriber (por defecto: 1)
-VERBOSE          Log de cada frame procesado: 1/true/yes (por defecto: false)
-ROS_DOMAIN_ID    ID de dominio DDS de ROS2 (por defecto: 0)
+Environment variables
+---------------------
+ROS_TOPIC           ROS2 image topic to subscribe to
+                    (default: /camera/image_raw)
+RTSP_HOST           Host where MediaMTX is running (default: 127.0.0.1)
+RTSP_PORT           RTSP port of MediaMTX (default: 8554)
+                    Change this when another MediaMTX instance is already
+                    using the default port on the same host.
+RTSP_NAME           RTSP path name (default: stream)
+VIDEO_CODEC         FFmpeg video codec (default: libx264)
+VIDEO_BITRATE       Output stream bitrate (default: 1000k)
+VIDEO_PRESET        x264 preset (default: ultrafast)
+VIDEO_TUNE          x264 tune (default: zerolatency)
+TARGET_FPS          Output stream frame rate (default: 30)
+IMAGE_WIDTH         Resize width before encoding; 0 = no resize (default: 0)
+IMAGE_HEIGHT        Resize height before encoding; 0 = no resize (default: 0)
+QOS_DEPTH           Subscriber QoS history depth (default: 1)
+VERBOSE             Log every processed frame: 1/true/yes (default: false)
+ROS_DOMAIN_ID       ROS2 DDS domain ID (default: 0)
 """
 
 import os
 import subprocess
 import threading
-import time
 from typing import Optional
 
 import cv2
@@ -61,12 +60,12 @@ def _env_bool(key: str, default: bool = False) -> bool:
 
 
 def _h264_compat_flags() -> list[str]:
-    """Flags necesarios para compatibilidad WebRTC en navegadores."""
+    """Extra flags required for H264 WebRTC browser compatibility."""
     return [
         "-pix_fmt",   "yuv420p",
         "-profile:v", "baseline",
         "-level:v",   "4.2",
-        "-bf",        "0",       # sin B-frames (requerimiento WebRTC)
+        "-bf",        "0",   # no B-frames (WebRTC requirement)
     ]
 
 
@@ -78,29 +77,32 @@ class ImageStreamerNode(Node):
         super().__init__("image_streamer")
 
         # ── Config ────────────────────────────────────────────────────────────
-        self.ros_topic: str    = os.environ.get("ROS_TOPIC", "/camera/image_raw")
-        self.rtsp_host: str    = os.environ.get("RTSP_HOST", "127.0.0.1")
-        self.rtsp_port: str    = os.environ.get("RTSP_PORT", "8554")
-        self.rtsp_name: str    = os.environ.get("RTSP_NAME", "stream")
-        self.codec: str        = os.environ.get("VIDEO_CODEC", "libx264")
-        self.bitrate: str      = os.environ.get("VIDEO_BITRATE", "1000k")
-        self.preset: str       = os.environ.get("VIDEO_PRESET", "ultrafast")
-        self.tune: str         = os.environ.get("VIDEO_TUNE", "zerolatency")
-        self.target_fps: int   = _env_int("TARGET_FPS", 30)
-        self.img_width: int    = _env_int("IMAGE_WIDTH", 0)
-        self.img_height: int   = _env_int("IMAGE_HEIGHT", 0)
-        self.qos_depth: int    = _env_int("QOS_DEPTH", 1)
-        self.verbose: bool     = _env_bool("VERBOSE")
+        self.ros_topic: str  = os.environ.get("ROS_TOPIC",      "/camera/image_raw")
+        self.rtsp_host: str  = os.environ.get("RTSP_HOST",      "127.0.0.1")
+        self.rtsp_port: str  = os.environ.get("RTSP_PORT",      "8554")
+        self.rtsp_name: str  = os.environ.get("RTSP_NAME",      "stream")
+        self.codec: str      = os.environ.get("VIDEO_CODEC",    "libx264")
+        self.bitrate: str    = os.environ.get("VIDEO_BITRATE",  "1000k")
+        self.preset: str     = os.environ.get("VIDEO_PRESET",   "ultrafast")
+        self.tune: str       = os.environ.get("VIDEO_TUNE",     "zerolatency")
+        self.target_fps: int = _env_int("TARGET_FPS",   30)
+        self.img_width: int  = _env_int("IMAGE_WIDTH",  0)
+        self.img_height: int = _env_int("IMAGE_HEIGHT", 0)
+        self.qos_depth: int  = _env_int("QOS_DEPTH",   1)
+        self.verbose: bool   = _env_bool("VERBOSE")
+
+        # HLS/WebRTC ports are only used for the startup log message;
+        # MediaMTX is already configured by entrypoint.sh before this node starts.
+        rtsp_port_hls    = os.environ.get("RTSP_PORT_HLS",    "8888")
+        rtsp_port_webrtc = os.environ.get("RTSP_PORT_WEBRTC", "8889")
 
         self.rtsp_url = f"rtsp://{self.rtsp_host}:{self.rtsp_port}/{self.rtsp_name}"
 
-        # ── Estado interno ────────────────────────────────────────────────────
+        # ── State ─────────────────────────────────────────────────────────────
         self._bridge = CvBridge()
         self._ffmpeg: Optional[subprocess.Popen] = None
         self._lock = threading.Lock()
         self._frame_count = 0
-
-        # Dimensiones del stream (se detectan en el primer frame)
         self._width: Optional[int] = None
         self._height: Optional[int] = None
 
@@ -119,22 +121,22 @@ class ImageStreamerNode(Node):
         )
 
         self.get_logger().info(
-            f"\n  Topic ROS2 : {self.ros_topic}"
+            f"\n  ROS2 topic : {self.ros_topic}"
             f"\n  RTSP URL   : {self.rtsp_url}"
-            f"\n  HLS        : http://{self.rtsp_host}:8888/{self.rtsp_name}"
-            f"\n  WebRTC     : http://{self.rtsp_host}:8889/{self.rtsp_name}"
+            f"\n  HLS        : http://{self.rtsp_host}:{rtsp_port_hls}/{self.rtsp_name}"
+            f"\n  WebRTC     : http://{self.rtsp_host}:{rtsp_port_webrtc}/{self.rtsp_name}"
             f"\n  Codec      : {self.codec}  bitrate={self.bitrate}"
             f"\n  Target FPS : {self.target_fps}"
-            f"\n  Resize     : {self.img_width}x{self.img_height} (0 = sin cambio)"
+            f"\n  Resize     : {self.img_width}x{self.img_height} (0 = disabled)"
         )
 
-    # ── Callback ROS2 ─────────────────────────────────────────────────────────
+    # ── ROS2 callback ─────────────────────────────────────────────────────────
 
     def _on_image(self, msg: Image):
         try:
             frame: np.ndarray = self._bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         except Exception as exc:
-            self.get_logger().error(f"Error convirtiendo imagen: {exc}")
+            self.get_logger().error(f"Failed to convert image: {exc}")
             return
 
         if self.img_width > 0 and self.img_height > 0:
@@ -143,24 +145,23 @@ class ImageStreamerNode(Node):
         h, w = frame.shape[:2]
 
         with self._lock:
-            # Si las dimensiones han cambiado (o primer frame), reiniciar ffmpeg
             if self._ffmpeg is None or self._width != w or self._height != h:
                 self._restart_ffmpeg(w, h)
 
             if self._ffmpeg is None or self._ffmpeg.poll() is not None:
-                self.get_logger().warning("FFmpeg no está corriendo, descartando frame.")
+                self.get_logger().warning("FFmpeg is not running, dropping frame.")
                 return
 
             try:
                 self._ffmpeg.stdin.write(frame.tobytes())
             except BrokenPipeError:
-                self.get_logger().warning("Pipe roto con FFmpeg, se reiniciará en el próximo frame.")
+                self.get_logger().warning("Broken pipe to FFmpeg, will restart on next frame.")
                 self._ffmpeg = None
                 return
 
         self._frame_count += 1
         if self.verbose:
-            self.get_logger().info(f"Frame #{self._frame_count} enviado a FFmpeg")
+            self.get_logger().info(f"Frame #{self._frame_count} sent to FFmpeg")
 
     # ── FFmpeg management ─────────────────────────────────────────────────────
 
@@ -168,14 +169,12 @@ class ImageStreamerNode(Node):
         cmd = [
             "ffmpeg",
             "-loglevel", "warning",
-            # Entrada: rawvideo desde stdin
-            "-f",          "rawvideo",
+            "-f",            "rawvideo",
             "-pixel_format", "bgr24",
-            "-video_size",  f"{width}x{height}",
-            "-framerate",   str(self.target_fps),
-            "-i",          "pipe:0",
-            # Codec de salida
-            "-c:v", self.codec,
+            "-video_size",   f"{width}x{height}",
+            "-framerate",    str(self.target_fps),
+            "-i",            "pipe:0",
+            "-c:v",          self.codec,
         ]
 
         if self.codec == "libx264":
@@ -184,14 +183,14 @@ class ImageStreamerNode(Node):
 
         cmd += [
             "-b:v", self.bitrate,
-            "-an",              # sin audio (el topic ROS2 es sólo vídeo)
+            "-an",          # no audio
             "-f",  "rtsp",
             self.rtsp_url,
         ]
         return cmd
 
     def _restart_ffmpeg(self, width: int, height: int):
-        """Cierra el proceso ffmpeg existente y arranca uno nuevo."""
+        """Terminate any existing FFmpeg process and start a fresh one."""
         if self._ffmpeg is not None:
             try:
                 self._ffmpeg.stdin.close()
@@ -199,12 +198,12 @@ class ImageStreamerNode(Node):
             except Exception:
                 self._ffmpeg.kill()
 
-        self._width = width
+        self._width  = width
         self._height = height
 
         cmd = self._build_ffmpeg_cmd(width, height)
         self.get_logger().info(
-            f"Arrancando FFmpeg {width}x{height} → {self.rtsp_url}\n"
+            f"Starting FFmpeg {width}x{height} -> {self.rtsp_url}\n"
             f"  cmd: {' '.join(cmd)}"
         )
 
@@ -215,7 +214,6 @@ class ImageStreamerNode(Node):
             stderr=subprocess.PIPE,
         )
 
-        # Hilo para leer stderr de ffmpeg y enviarlo al logger
         threading.Thread(
             target=self._log_ffmpeg_stderr,
             args=(self._ffmpeg,),
