@@ -1,0 +1,14 @@
+# camera-inference.network
+#
+# Podman quadlet network unit for the camera inference stack.
+# Containers that do NOT use network_mode=host attach to this bridge network
+# so they can reach each other by service name.
+#
+# Place this file in:
+#   System (root):  /etc/containers/systemd/
+#   User (rootless): ~/.config/containers/systemd/
+
+[Network]
+# DNS is enabled by default on Podman networks — containers resolve
+# each other by the [Container] name declared in each .container unit.
+Label=app=camera-inference

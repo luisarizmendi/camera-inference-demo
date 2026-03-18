@@ -1,0 +1,54 @@
+# camera-gateway-rtsp.container
+#
+# Podman quadlet unit — USB webcam → MediaMTX → RTSP + WebRTC + HLS
+#
+# Place this file (and the other .container / .network files) in:
+#   System (root):   /etc/containers/systemd/
+#   User (rootless): ~/.config/containers/systemd/
+#
+# Then reload and start:
+#   systemctl daemon-reload          # or: systemctl --user daemon-reload
+#   systemctl start camera-gateway-rtsp.service
+
+[Unit]
+Description=Camera Gateway RTSP — webcam capture and streaming
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=quay.io/luisarizmendi/camera-gateway-rtsp:latest
+
+# Use host networking so WebRTC ICE candidates are reachable from the LAN.
+# All ports (8554 RTSP, 8888 HLS, 8889 WebRTC, 8189/udp ICE) are exposed
+# directly on the host.
+Network=host
+
+# Pass the webcam device into the container.
+# Change /dev/video0 to match your camera.
+AddDevice=/dev/video0
+
+# Disable SELinux label confinement so the container can access the device.
+SecurityLabelDisable=true
+
+# Add the container process to the video group so it can open /dev/video*.
+# Replace 44 with the actual GID of the 'video' group on your host:
+#   getent group video | cut -d: -f3
+AddGroup=44
+
+# ── Environment ────────────────────────────────────────────────────────────────
+# Set MTX_WEBRTCADDITIONALHOSTS to your host LAN IP so browsers on other
+# machines receive usable ICE candidates.
+Environment=MTX_WEBRTCADDITIONALHOSTS=192.168.1.41
+Environment=RTSP_NAME=stream
+# Environment=CAM_FRAMERATE=30
+# Environment=CAM_RESOLUTION=1280x720
+# Environment=CAM_VIDEO_BITRATE=2000k
+# Environment=CAM_PRESET=ultrafast
+# Environment=CAM_TUNE=zerolatency
+
+# ── Restart policy ────────────────────────────────────────────────────────────
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,33 @@
+# ros2-rosbridge.container
+#
+# Podman quadlet unit — ROS2 topics → WebSocket bridge for the browser
+#
+# Place this file (and the other .container / .network files) in:
+#   System (root):   /etc/containers/systemd/
+#   User (rootless): ~/.config/containers/systemd/
+
+[Unit]
+Description=ROS2 Rosbridge — WebSocket bridge to the browser
+After=network-online.target ros2-inference.service
+Wants=network-online.target
+
+[Container]
+Image=quay.io/luisarizmendi/ros2-rosbridge:latest
+
+# Host networking is required so this container joins the same DDS domain
+# as ros2-inference. The WebSocket port (9099) is exposed on the host directly.
+Network=host
+
+# Shared memory mount — improves DDS transport performance.
+Volume=/dev/shm:/dev/shm
+
+# ── Environment ────────────────────────────────────────────────────────────────
+Environment=ROSBRIDGE_PORT=9099
+# Environment=ROS_DOMAIN_ID=0
+
+# ── Restart policy ────────────────────────────────────────────────────────────
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

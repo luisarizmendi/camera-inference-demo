@@ -2,13 +2,14 @@
 
 Exposes ROS2 topics as a WebSocket server using `rosbridge_suite`.
 The browser viewer connects to this service to receive detection messages
-without needing a ROS2 installation.
+without needing a ROS2 installation on the client.
 
 ## Structure
 
 ```
 ros2-rosbridge/
 ├── README.md
+├── build.sh
 └── src/
     ├── Containerfile
     └── entrypoint.sh
@@ -16,49 +17,53 @@ ros2-rosbridge/
 
 ## How it works
 
-`rosbridge_suite` is not available in the `tavie/ros2` COPR for Kilted, so
-it is cloned from the official `ros2` branch of
-[RobotWebTools/rosbridge_suite](https://github.com/RobotWebTools/rosbridge_suite)
-and built with `colcon` during the image build.
+Built on top of the official `ros:kilted` image. `rosbridge_server` and
+`rosbridge_library` are installed from the official ROS2 apt repository for
+Ubuntu Noble (Kilted). The entrypoint launches `rosbridge_websocket` on
+`ROSBRIDGE_PORT` using the ROS2 Kilted environment.
 
-Two patches are applied to the cloned source before building:
-1. `ament_cmake_mypy` and `ament_mypy` references are stripped from all
-   `CMakeLists.txt` files — this package is not available and is only needed
-   for type checking, not runtime.
-2. `type_support.py` is patched to replace a missing
-   `rosidl_pycommon.interface_base_classes` import (not present in Kilted)
-   with compatible `object` stubs.
+## Build
+
+```bash
+cd ros2-rosbridge
+./build.sh
+```
+
+| Flag | Description |
+|------|-------------|
+| `--no-push` | Build locally, skip push |
+| `--cross` | Also cross-build for the opposite arch |
+| `--registry <reg>` | Override default registry (`quay.io/luisarizmendi`) |
+| `--force-manifest-reset` | Recreate the remote multi-arch manifest from scratch |
+
+```bash
+# Local-only build
+./build.sh --no-push
+
+# Cross-build amd64 + arm64
+./build.sh --cross
+```
 
 ## Environment variables
 
 | Variable         | Default | Description |
 |------------------|---------|-------------|
 | `ROSBRIDGE_PORT` | `9099`  | WebSocket server port |
-| `ROS_DOMAIN_ID`  | `0`     | ROS2 DDS domain ID — must match ros2-inference |
+| `ROS_DOMAIN_ID`  | `0`     | ROS2 DDS domain ID — must match `ros2-inference` |
 
-## Build
-
-```bash
-cd ros2-fedora-base/src  && podman build -t ros2-fedora-base:latest .
-cd ros2-rosbridge/src    && podman build -t ros2-rosbridge:latest .
-```
-
-> The build clones rosbridge_suite from GitHub — requires internet access.
-> Build time is ~5 minutes due to colcon compilation.
-
-## Run
+## Run (standalone)
 
 ```bash
 podman run --rm --network host \
   -e ROSBRIDGE_PORT=9099 \
   -v /dev/shm:/dev/shm \
-  ros2-rosbridge:latest
+  quay.io/luisarizmendi/ros2-rosbridge:latest
 ```
 
 ## Browser client protocol
 
 The viewer connects using the native WebSocket API and speaks the
-rosbridge v2 JSON protocol directly — no roslibjs library required.
+rosbridge v2 JSON protocol — no roslibjs library required.
 
 Subscribe example:
 ```json
@@ -72,13 +77,13 @@ Incoming message format:
 
 ## Troubleshooting
 
-If the browser can't connect, verify:
-1. `ros2-inference` and `ros2-rosbridge` are both running with `--network host`
-2. Both have the same `ROS_DOMAIN_ID`
-3. Port 9099 is reachable from the browser (no firewall blocking it)
+If the browser cannot connect, verify:
+1. `ros2-inference` and `ros2-rosbridge` are both running with `--network host`.
+2. Both have the same `ROS_DOMAIN_ID`.
+3. Port 9099 is reachable from the browser (no firewall blocking it).
 4. The inference node is actually publishing — check with:
    ```bash
    podman exec -it <rosbridge_container> /bin/bash
-   source /usr/lib64/ros2-kilted/setup.bash && source /ros2_ws/install/setup.bash
+   source /opt/ros/kilted/setup.bash
    ros2 topic echo /detections
    ```

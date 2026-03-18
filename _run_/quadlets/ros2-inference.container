@@ -1,0 +1,47 @@
+# ros2-inference.container
+#
+# Podman quadlet unit — RTSP frame pull → YOLOv11 → /detections publisher
+#
+# Place this file (and the other .container / .network files) in:
+#   System (root):   /etc/containers/systemd/
+#   User (rootless): ~/.config/containers/systemd/
+
+[Unit]
+Description=ROS2 Inference — YOLOv11 object detection from RTSP stream
+After=network-online.target camera-gateway-rtsp.service
+Wants=network-online.target
+
+[Container]
+Image=quay.io/luisarizmendi/ros2-inference:latest
+
+# Host networking is required so this container shares the ROS2 DDS bus
+# with ros2-rosbridge (both must be on the same network for DDS multicast).
+Network=host
+
+# Shared memory mount — improves DDS transport performance.
+Volume=/dev/shm:/dev/shm
+
+# ── NVIDIA GPU (optional) ──────────────────────────────────────────────────────
+# Uncomment these two lines to enable GPU inference:
+# AddDevice=nvidia.com/gpu=all
+# SecurityLabelDisable=true
+
+# ── Environment ────────────────────────────────────────────────────────────────
+# Set RTSP_URL to the LAN IP of the host running camera-gateway-rtsp.
+Environment=RTSP_URL=rtsp://192.168.1.41:8554/stream
+Environment=YOLO_MODEL=yolo11n.pt
+Environment=TARGET_FPS=30
+Environment=DEVICE=auto
+# Environment=CONFIDENCE_THRESHOLD=0.4
+# Environment=INFERENCE_WIDTH=640
+# Environment=INFERENCE_HEIGHT=640
+# Environment=DETECTION_TTL=1.0
+# Environment=VERBOSE=false
+# Environment=ROS_DOMAIN_ID=0
+
+# ── Restart policy ────────────────────────────────────────────────────────────
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

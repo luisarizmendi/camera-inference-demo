@@ -1,0 +1,26 @@
+# image-inference-viewer.container
+#
+# Podman quadlet unit — nginx serving the static HTML overlay viewer
+#
+# Place this file (and the other .container / .network files) in:
+#   System (root):   /etc/containers/systemd/
+#   User (rootless): ~/.config/containers/systemd/
+
+[Unit]
+Description=Image Inference Viewer — static HTML overlay UI
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=quay.io/luisarizmendi/image-inference-viewer:latest
+
+# This container only serves a static page; it does not need host networking
+# or access to the ROS2 DDS bus. A mapped port is sufficient.
+PublishPort=8080:8080
+
+# ── Restart policy ────────────────────────────────────────────────────────────
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=default.target
