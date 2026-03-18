@@ -60,6 +60,8 @@ COPY --from=ros-builder    /ros2_ws/install /ros2_ws/install
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+RUN mkdir -p /tmp/yolo_config/Ultralytics && chmod -R 777 /tmp/yolo_config && mkdir -p /opt/yolo_models
+
 ENV YOLO_MODELS_DIR=/opt/yolo_models
 ENV YOLO_CONFIG_DIR=/tmp/yolo_config
 ENV RTSP_URL=rtsp://127.0.0.1:8554/stream

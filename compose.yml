@@ -59,14 +59,17 @@ services:
     image: quay.io/luisarizmendi/ros2-inference:latest
     restart: unless-stopped
     network_mode: host 
-    # devices:
-    #   - /dev/nvidia0:/dev/nvidia0     # Uncomment if using specific GPU
+    #
+    # Uncomment for NVIDIA GPU:
+    #
+    devices:
+      - nvidia.com/gpu=all
     security_opt:
       - label=disable
     volumes:
       - /dev/shm:/dev/shm
     environment:
-      RTSP_URL: "rtsp://http://127.0.0.1:8554/stream"  # match your RTSP stream ########
+      RTSP_URL: "rtsp://192.168.1.41:8554/stream"  # match your RTSP stream ########
       YOLO_MODEL: "yolo11n.pt"
       TARGET_FPS: "30"
       DEVICE: "auto"
@@ -76,11 +79,7 @@ services:
       # INFERENCE_HEIGHT: "640"
       # VERBOSE: "false"
       # ROS_DOMAIN_ID: "0"
-    #
-    # Uncomment for NVIDIA GPU:
-    #
-    devices:
-      - nvidia.com/gpu=all
+
 
   # ── Image viewer ─────────────────────────────────────────────────────────────
   image-inference-viewer:
