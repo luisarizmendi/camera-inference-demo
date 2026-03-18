@@ -59,11 +59,6 @@ services:
     image: quay.io/luisarizmendi/ros2-inference:latest
     restart: unless-stopped
     network_mode: host 
-    #
-    # Uncomment for NVIDIA GPU:
-    #
-    devices:
-      - nvidia.com/gpu=all
     security_opt:
       - label=disable
     volumes:
@@ -79,7 +74,11 @@ services:
       # INFERENCE_HEIGHT: "640"
       # VERBOSE: "false"
       # ROS_DOMAIN_ID: "0"
-
+    #
+    # Uncomment for NVIDIA GPU:
+    #
+    devices:
+      - nvidia.com/gpu=all
 
   # ── Image viewer ─────────────────────────────────────────────────────────────
   image-inference-viewer:
