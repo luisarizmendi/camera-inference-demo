@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     ros-kilted-cv-bridge \
     ros-kilted-vision-msgs \
     python3-opencv \
+    python3-pip \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
