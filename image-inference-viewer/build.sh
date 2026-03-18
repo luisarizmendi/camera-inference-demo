@@ -71,10 +71,8 @@ build_image() {
   BUILT_IMAGES+=("$tag")
 }
 
-# Always build native
 build_image "$HOST_ARCH"
 
-# Cross-build if enabled
 if [[ "$CROSS_BUILD" == true ]]; then
   if [[ "$HOST_ARCH" == "amd64" ]]; then
     build_image "arm64"
@@ -93,72 +91,59 @@ for img in "${BUILT_IMAGES[@]}"; do
   BUILT_ARCHES+=("$(basename "$img" | sed 's/.*://')")
 done
 
+# --- All known architectures ---
+ALL_ARCHES=("amd64" "arm64")
+
 # ---------------------------------------------------------------------------
-# merge_manifest <manifest_tag>
+# push_manifest <manifest_tag>
 #
-# Strategy: seed the local manifest by cloning the remote one, then swap out
-# only the entries for arches we rebuilt.  All other arch entries are carried
-# forward untouched because they were part of the cloned manifest from the start.
-#
-# `podman manifest create <name> docker://<remote>` does the clone — it pulls
-# the manifest list metadata (not the image layers) and stores it locally,
-# giving us a starting point that already contains every existing arch entry.
+# 1. Push the freshly built arch-specific images to the registry.
+# 2. For every arch we did NOT build, try to pull its arch-specific tag from
+#    the registry (e.g. :arm64). If it exists, it goes into the manifest too.
+# 3. Create a fresh local manifest, add everything, push.
 # ---------------------------------------------------------------------------
-merge_manifest() {
+push_manifest() {
   local manifest=$1
 
-  # Clean up any stale local copy
+  # Clean up any stale local manifest
   podman manifest rm  "$manifest" 2>/dev/null || true
   podman rmi --force  "$manifest" 2>/dev/null || true
+  podman manifest create "$manifest"
 
-  if [[ "$FORCE_MANIFEST_RESET" == false ]] && \
-     podman manifest inspect "docker://${manifest}" &>/dev/null; then
+  if [[ "$FORCE_MANIFEST_RESET" == false ]]; then
+    # Pull arch-specific images we did NOT build this run
+    for arch in "${ALL_ARCHES[@]}"; do
+      local already_built=false
+      for built_arch in "${BUILT_ARCHES[@]}"; do
+        [[ "$built_arch" == "$arch" ]] && already_built=true && break
+      done
 
-    echo "→ Seeding local manifest from remote: ${manifest}"
-    podman manifest create "$manifest" "docker://${manifest}"
-
-    # Remove the stale entry for each arch we are about to replace
-    for arch in "${BUILT_ARCHES[@]}"; do
-      local digest
-      digest=$(podman manifest inspect "$manifest" 2>/dev/null \
-        | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-for m in data.get('manifests', []):
-    if m.get('platform', {}).get('architecture') == '${arch}':
-        print(m['digest'])
-        break
-" 2>/dev/null || true)
-
-      if [[ -n "$digest" ]]; then
-        echo "  → Removing stale ${arch} entry (${digest:0:19}...) to replace with fresh build"
-        podman manifest remove "$manifest" "$digest"
+      if [[ "$already_built" == false ]]; then
+        local arch_tag="${REGISTRY}/${IMAGE_NAME}:${arch}"
+        echo "  → Pulling existing ${arch} image from registry: ${arch_tag}"
+        if podman pull --platform "linux/${arch}" "${arch_tag}" 2>/dev/null; then
+          echo "  → Adding pulled ${arch} to manifest"
+          podman manifest add "$manifest" "$arch_tag"
+        else
+          echo "  → No existing ${arch} image found in registry — skipping"
+        fi
       fi
     done
-
-  else
-    if [[ "$FORCE_MANIFEST_RESET" == true ]]; then
-      echo "→ Creating fresh manifest (--force-manifest-reset): ${manifest}"
-    else
-      echo "→ No existing remote manifest — creating fresh: ${manifest}"
-    fi
-    podman manifest create "$manifest"
   fi
 
-  # Add freshly built images
+  # Add the freshly built images
   for img in "${BUILT_IMAGES[@]}"; do
     local arch
     arch=$(basename "$img" | sed 's/.*://')
-    echo "  → Adding rebuilt ${arch}: ${img}"
+    echo "  → Adding freshly built ${arch} to manifest"
     podman manifest add "$manifest" "$img"
   done
 
-  echo "  Manifest contents after merge:"
+  echo "  Manifest contents:"
   podman manifest inspect "$manifest" \
     | python3 -c "
 import sys, json
-data = json.load(sys.stdin)
-for m in data.get('manifests', []):
+for m in json.load(sys.stdin).get('manifests', []):
     arch   = m.get('platform', {}).get('architecture', '?')
     digest = m.get('digest', '')
     print(f'    {arch}  →  {digest[:19]}...')
@@ -174,14 +159,13 @@ if [[ "$PUSH" == true ]]; then
   done
 
   echo ""
-  echo "→ Merging manifests..."
-  merge_manifest "$MANIFEST_PROD"
-  merge_manifest "$MANIFEST_LATEST"
+  echo "→ Building and pushing manifest: prod"
+  push_manifest "$MANIFEST_PROD"
+  podman manifest push --rm "$MANIFEST_PROD"
 
   echo ""
-  echo "→ Pushing manifest: prod"
-  podman manifest push --rm "$MANIFEST_PROD"
-  echo "→ Pushing manifest: latest"
+  echo "→ Building and pushing manifest: latest"
+  push_manifest "$MANIFEST_LATEST"
   podman manifest push --rm "$MANIFEST_LATEST"
 
   echo ""
