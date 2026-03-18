@@ -4,7 +4,6 @@
 #   podman build -t ros2-fedora-base:latest    ros2-fedora-base/src/
 #   podman build -t ros2-inference:latest      ros2-inference/src/
 #   podman build -t ros2-rosbridge:latest      ros2-rosbridge/src/
-#   podman build -t ros2-broker-watch:latest         ros2-broker-watch/src/      # optional
 #   podman build -t camera-gateway-rtsp:latest camera-gateway-rtsp/src/
 #
 # Start:  podman compose up -d
@@ -92,12 +91,3 @@ services:
       ROSBRIDGE_PORT: "9099"
       ROS_DOMAIN_ID: "0"
 
-  # ── Optional: topic health monitor ───────────────────────────────────────────
-  # ros2-broker-watch:
-  #   image: ros2-broker-watch:latest
-  #   restart: unless-stopped
-  #   network_mode: host
-  #   environment:
-  #     TOPICS: "/detections"
-  #     STALE_TIMEOUT: "10"
-  #     ROS_DOMAIN_ID: "0"
