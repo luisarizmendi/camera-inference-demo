@@ -10,6 +10,35 @@ Everything is designed to run with **Podman** (rootless or root), built and depl
 
 ---
 
+## Why ROS2?
+
+**ROS2 (Robot Operating System 2)** is an open-source middleware framework originally designed for robotics, but increasingly used in any system that needs to pass structured data between loosely-coupled processes in real time. Despite the name, it is not an operating system — it is a communication layer and toolbox that runs on top of Linux (or Windows/macOS).
+
+The core concept in ROS2 is the **topic**: a named, typed message bus where any number of publishers and subscribers can connect without knowing about each other. A publisher just sends messages; subscribers just receive them. The underlying transport (called **DDS — Data Distribution Service**) handles discovery, queuing, and delivery automatically, both within a single machine over shared memory and across machines over the network.
+
+For this project ROS2 is used to carry the inference results — and only those — between the YOLOv11 node and the browser bridge. Here is why that is a good fit:
+
+**Decoupled producers and consumers.** The inference node and the rosbridge server are completely independent containers. Either can be restarted, replaced, or scaled without touching the other. No explicit connection management is needed between them.
+
+**Typed, schema-enforced messages.** Detections are published as `vision_msgs/Detection2DArray`, a well-defined message type that includes bounding box geometry, class label, and confidence score. Any consumer — browser, logging node, another ML model — knows exactly what to expect without reading any custom protocol documentation.
+
+**No video in the bus.** Video frames are deliberately kept out of ROS2. They travel from MediaMTX to the browser over WebRTC and to the inference node over RTSP — both paths optimised for raw throughput and latency. ROS2 only carries the tiny detection metadata (a few hundred bytes per frame), so the DDS bus never becomes a bottleneck regardless of frame resolution or rate.
+
+**Observability for free.** Because detections are on a named topic, you can inspect the live data stream from any machine on the same network with a single command, with no changes to the running stack:
+
+```bash
+source /opt/ros/kilted/setup.bash
+ros2 topic echo /detections
+```
+
+The optional `ros2-broker-watch` service also exploits this to publish topic health diagnostics without touching the inference pipeline at all.
+
+**Extensibility.** Swapping YOLOv11 for a different model, adding a second inference node for a different task, or feeding detections into a downstream decision node all require zero changes to the transport layer. New nodes simply subscribe to the existing topic, or publish on a new one.
+
+In short: ROS2 provides a clean, typed, observable message bus between the inference container and the browser bridge at essentially no overhead, while keeping the high-bandwidth video path entirely out of the middleware.
+
+---
+
 ## Architecture
 
 ```
@@ -23,6 +52,7 @@ camera-gateway-rtsp  ── Fedora + FFmpeg + MediaMTX
     └── RTSP    :8554 ──► ros2-inference  (ROS + CUDA + YOLOv11)
                                │
                                │  /detections  (vision_msgs/Detection2DArray)
+                               │  ← ROS2 DDS topic →
                                ▼
                           ros2-rosbridge :9099 ──────────────► browser canvas overlay
                                │
