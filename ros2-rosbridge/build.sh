@@ -94,7 +94,7 @@ ensure_manifest() {
   if [[ "$FORCE_MANIFEST_RESET" == true ]]; then
     echo "→ Force reset enabled: deleting $manifest if exists"
     podman manifest rm "$manifest" 2>/dev/null || true
-    podman manifest create "$manifest"
+    podman manifest create  --replace  "$manifest"
     return
   fi
 
@@ -107,7 +107,7 @@ ensure_manifest() {
       echo "  Pulled existing remote manifest"
     else
       echo "  Creating new manifest"
-      podman manifest create "$manifest"
+      podman manifest create  --replace  "$manifest"
     fi
   fi
 }
