@@ -1,7 +1,6 @@
 # image-inference-viewer
 
-Static single-page HTML viewer served by nginx. Displays the camera stream
-with live bounding-box overlay from YOLOv11 detections.
+Static single-page HTML viewer served by nginx. Shows the camera stream with a live bounding-box overlay from YOLOv11 detections.
 
 ## Structure
 
@@ -17,20 +16,16 @@ image-inference-viewer/
 
 ## How it works
 
-nginx serves `index.html` once. After that the browser makes two independent connections:
+nginx serves `index.html` once, and after that the browser makes two independent connections:
 
-1. **WebRTC** → MediaMTX WHEP endpoint (`:8889`) — receives the live video stream.
-2. **WebSocket** → rosbridge (`:9099`) — receives detection messages.
+1. **WebRTC** to the MediaMTX WHEP endpoint (`:8889`), for the live video stream.
+2. **WebSocket** to rosbridge (`:9099`), for detection messages.
 
-The browser composites them using a `<canvas>` element layered over the `<video>` element.
-Bounding boxes, class labels, and confidence scores are drawn on the canvas every animation
-frame using the latest detections received.
+The browser composites them using a `<canvas>` element layered over the `<video>` element. Bounding boxes, class labels and confidence scores are drawn on the canvas each animation frame using the latest detections received.
 
-The overlay correctly handles `object-fit: contain` letterboxing — boxes stay
-aligned with the video content even when the video is pillarboxed or letterboxed.
+The overlay handles `object-fit: contain` letterboxing correctly, so boxes stay aligned with the video content even when it is pillarboxed or letterboxed.
 
-nginx runs rootless (as `nobody`). All temp/cache paths are under `/tmp`
-via a fully custom `nginx.conf`.
+nginx runs rootless (as `nobody`). All temp and cache paths are under `/tmp` via a custom `nginx.conf`.
 
 ## Build
 
@@ -53,7 +48,7 @@ cd image-inference-viewer
 
 ## Environment variables
 
-None — all connection settings are entered in the browser UI at runtime.
+None, all connection settings are entered in the browser UI at runtime.
 
 ## Run (standalone)
 
@@ -66,23 +61,19 @@ Open `http://<host-ip>:8080` in any browser on the network.
 
 ## Browser UI
 
-In the connection sidebar:
+Fill in the connection sidebar:
 
-| Field                | Example                   | Description |
-|----------------------|---------------------------|-------------|
-| MediaMTX host        | `192.168.1.41`            | IP of the host running camera-gateway-rtsp |
-| MediaMTX WebRTC port | `8889`                    | WebRTC WHEP port |
-| Stream name          | `stream`                  | Matches `RTSP_NAME` in camera-gateway-rtsp |
-| rosbridge WebSocket  | `ws://192.168.1.41:9099`  | rosbridge server address |
+| Field                | Example                  | Description |
+|----------------------|--------------------------|-------------|
+| MediaMTX host        | `192.168.1.41`           | IP of the host running camera-gateway-rtsp |
+| MediaMTX WebRTC port | `8889`                   | WebRTC WHEP port |
+| Stream name          | `stream`                 | Matches `RTSP_NAME` in camera-gateway-rtsp |
+| rosbridge WebSocket  | `ws://192.168.1.41:9099` | rosbridge server address |
 
-The host fields are auto-filled from the hostname the page was served from.
-
-Click **Connect** to start. The video and detection overlay activate independently —
-the overlay starts as soon as the first detection message arrives.
+The host fields are pre-filled from the page hostname when you open the viewer from the same machine. Click **Connect** and the video and overlay activate independently as each connection is established.
 
 ## Detection overlay behaviour
 
 - Each class gets a consistent colour derived from its name.
 - Labels show class name and confidence percentage.
-- When no detections arrive for `DETECTION_TTL` seconds (configured in `ros2-inference`),
-  the inference node publishes an empty array and the overlay clears automatically.
+- When no detections arrive for `DETECTION_TTL` seconds (set in `ros2-inference`), the inference node publishes an empty array and the overlay clears automatically.

@@ -1,10 +1,8 @@
 # camera-gateway-rtsp
 
-USB webcam (or video-file fallback) → MediaMTX → RTSP + WebRTC + HLS.
+Captures a USB webcam (or loops video files as fallback) and broadcasts it via MediaMTX as RTSP, WebRTC and HLS.
 
-This service is the entry point for the entire pipeline:
-- The browser receives the video stream directly via WebRTC (~150 ms latency).
-- The inference service pulls the same stream via RTSP.
+This is the entry point for the whole pipeline: the browser gets the video directly via WebRTC (~150 ms latency), and the inference service pulls the same stream over RTSP.
 
 ## Structure
 
@@ -21,12 +19,9 @@ camera-gateway-rtsp/
 
 ## How it works
 
-`entrypoint.sh` starts MediaMTX, waits for the RTSP port to be ready,
-then runs `stream.py`. The Python script probes `/dev/video*` devices,
-picks the first working webcam, and streams it to MediaMTX via FFmpeg.
-If no camera is found it falls back to looping video files from `VID_DIR`.
+`entrypoint.sh` starts MediaMTX, waits for the RTSP port to be ready, then runs `stream.py`. The script probes `/dev/video*` devices, picks the first working webcam, and streams it to MediaMTX via FFmpeg. If no camera is found it falls back to looping video files from `VID_DIR`.
 
-The base image is **Fedora latest** with FFmpeg from RPM Fusion.
+The base image is Fedora latest with FFmpeg from RPM Fusion.
 
 ## Build
 
@@ -53,7 +48,7 @@ cd camera-gateway-rtsp
 ./build.sh --cross
 ```
 
-Or build the image manually:
+Or build manually:
 
 ```bash
 podman build -t camera-gateway-rtsp:latest src/
@@ -63,25 +58,25 @@ podman build -t camera-gateway-rtsp:latest src/
 
 ### Stream output
 
-| Variable    | Default       | Description |
-|-------------|---------------|-------------|
-| `RTSP_HOST` | `127.0.0.1`   | MediaMTX host for FFmpeg to push to |
-| `RTSP_PORT` | `8554`        | RTSP port |
-| `RTSP_NAME` | `stream`      | Stream path (`rtsp://host:8554/stream`) |
+| Variable    | Default     | Description |
+|-------------|-------------|-------------|
+| `RTSP_HOST` | `127.0.0.1` | MediaMTX host for FFmpeg to push to |
+| `RTSP_PORT` | `8554`      | RTSP port |
+| `RTSP_NAME` | `stream`    | Stream path (`rtsp://host:8554/stream`) |
 
 ### Webcam options
 
-| Variable            | Default      | Description |
-|---------------------|--------------|-------------|
-| `CAM_FRAMERATE`     | `30`         | Capture framerate |
-| `CAM_RESOLUTION`    | _(auto)_     | Resolution e.g. `1280x720`; empty = camera default |
-| `CAM_VIDEO_CODEC`   | `libx264`    | FFmpeg video codec |
-| `CAM_VIDEO_BITRATE` | `600k`       | Video bitrate |
-| `CAM_AUDIO_CODEC`   | `libopus`    | Audio codec |
-| `CAM_AUDIO_BITRATE` | `64k`        | Audio bitrate |
-| `CAM_PRESET`        | `ultrafast`  | x264 preset |
-| `CAM_TUNE`          | `zerolatency`| x264 tune |
-| `CAM_RTBUFSIZE`     | `100M`       | FFmpeg input ring-buffer size |
+| Variable            | Default       | Description |
+|---------------------|---------------|-------------|
+| `CAM_FRAMERATE`     | `30`          | Capture framerate |
+| `CAM_RESOLUTION`    | _(auto)_      | Resolution, e.g. `1280x720`, empty means camera default |
+| `CAM_VIDEO_CODEC`   | `libx264`     | FFmpeg video codec |
+| `CAM_VIDEO_BITRATE` | `600k`        | Video bitrate |
+| `CAM_AUDIO_CODEC`   | `libopus`     | Audio codec |
+| `CAM_AUDIO_BITRATE` | `64k`         | Audio bitrate |
+| `CAM_PRESET`        | `ultrafast`   | x264 preset |
+| `CAM_TUNE`          | `zerolatency` | x264 tune |
+| `CAM_RTBUFSIZE`     | `100M`        | FFmpeg input ring-buffer size |
 
 ### Video file fallback
 
@@ -100,12 +95,12 @@ podman build -t camera-gateway-rtsp:latest src/
 
 ## Ports
 
-| Port      | Protocol | Description |
-|-----------|----------|-------------|
-| 8554      | RTSP     | Camera stream (pulled by ros2-inference) |
-| 8888      | HLS      | Web player |
-| 8889      | WebRTC   | Browser viewer (WHEP endpoint) |
-| 8189/udp  | ICE      | WebRTC media transport |
+| Port     | Protocol | Description |
+|----------|----------|-------------|
+| 8554     | RTSP     | Camera stream, pulled by ros2-inference |
+| 8888     | HLS      | Web player |
+| 8889     | WebRTC   | Browser viewer (WHEP endpoint) |
+| 8189/udp | ICE      | WebRTC media transport |
 
 ## Run (standalone)
 
@@ -121,4 +116,4 @@ podman run --rm \
   quay.io/luisarizmendi/camera-gateway-rtsp:latest
 ```
 
-Set `MTX_WEBRTCADDITIONALHOSTS` to your host LAN IP so the browser can reach the WebRTC ICE candidates from another machine.
+Set `MTX_WEBRTCADDITIONALHOSTS` to your host LAN IP so browsers on other machines receive usable WebRTC ICE candidates.

@@ -1,10 +1,8 @@
 # ros2-broker-watch
 
-Optional monitoring service. Subscribes to ROS2 topics and publishes health
-diagnostics on `/broker/camera_status` as `diagnostic_msgs/DiagnosticArray`.
+Optional monitoring service. Subscribes to ROS2 topics and publishes health diagnostics on `/broker/camera_status` as `diagnostic_msgs/DiagnosticArray`.
 
-This container is **not in the critical path**. Run it to get visibility
-into detection rates and topic liveness without modifying the main pipeline.
+This container is not in the critical path. Run it if you want visibility into detection rates and topic liveness without touching the main pipeline.
 
 ## Structure
 
@@ -27,15 +25,11 @@ ros2-broker-watch/
 
 ## How it works
 
-Built on `ros:kilted-ros-base`. The `image_broker` ROS2 node subscribes to the
-topics listed in `CAMERA_TOPICS` and periodically evaluates their health,
-publishing a `DiagnosticArray` on `/broker/camera_status`. Optionally it can
-re-publish received messages on `/broker/<original_topic>`.
+Built on `ros:kilted-ros-base`. The `image_broker` node subscribes to the topics listed in `CAMERA_TOPICS`, periodically evaluates their health, and publishes a `DiagnosticArray` on `/broker/camera_status`. Optionally it re-publishes received messages on `/broker/<original_topic>`.
 
 ## Build
 
-There is no standalone `build.sh` in this helper. Use the root `build-all.sh`
-or build manually:
+No standalone `build.sh` here. Use the root `build-all.sh` or build manually:
 
 ```bash
 podman build -t ros2-broker-watch:latest _helpers_/ros2-broker-watch/src/
@@ -76,7 +70,7 @@ Each entry in the `DiagnosticArray` reports:
 
 | Field           | Description |
 |-----------------|-------------|
-| `level`         | `0` = OK · `2` = STALE |
+| `level`         | `0` = OK, `2` = STALE |
 | `total_frames`  | Messages received since startup |
 | `fps_estimate`  | Estimated messages/s over the last 2 s |
 | `last_seen_ago` | Time since the last message |
