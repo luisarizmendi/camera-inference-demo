@@ -83,6 +83,7 @@ cd ros2-inference/src   && podman build -t ros2-inference:latest .
 podman run --rm --network host \
   -e RTSP_URL="rtsp://192.168.1.41:8554/stream" \
   -e DEVICE="auto" \
+  -v /dev/shm:/dev/shm \
   ros2-inference:latest
 ```
 
@@ -93,6 +94,7 @@ podman run --rm --network host \
   --security-opt=label=disable --device nvidia.com/gpu=all \
   -e RTSP_URL="rtsp://192.168.1.41:8554/stream" \
   -e DEVICE="cuda" \
+  -v /dev/shm:/dev/shm \
   ros2-inference:latest
 ```
 
@@ -102,6 +104,7 @@ podman run --rm --network host \
 podman run --rm --network host \
   -v /path/to/my_model.pt:/opt/yolo_models/my_model.pt:ro \
   -e YOLO_MODEL="my_model.pt" \
+  -v /dev/shm:/dev/shm \
   ros2-inference:latest
 ```
 

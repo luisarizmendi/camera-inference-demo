@@ -51,6 +51,7 @@ cd ros2-rosbridge/src    && podman build -t ros2-rosbridge:latest .
 ```bash
 podman run --rm --network host \
   -e ROSBRIDGE_PORT=9099 \
+  -v /dev/shm:/dev/shm \
   ros2-rosbridge:latest
 ```
 

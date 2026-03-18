@@ -62,6 +62,8 @@ services:
     #   - /dev/nvidia0:/dev/nvidia0     # Uncomment if using specific GPU
     security_opt:
       - label=disable
+    volumes:
+      - /dev/shm:/dev/shm
     environment:
       RTSP_URL: "rtsp://192.168.1.41:8554/stream"  # match your RTSP stream
       YOLO_MODEL: "yolo11n.pt"
@@ -91,6 +93,8 @@ services:
     image: quay.io/luisarizmendi/ros2-rosbridge:latest
     restart: unless-stopped
     network_mode: host
+    volumes:
+      - /dev/shm:/dev/shm
     ports:
       - "9099:9099"
     environment:
