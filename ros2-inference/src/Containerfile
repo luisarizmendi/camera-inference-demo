@@ -4,22 +4,19 @@ FROM docker.io/nvidia/cuda:12.6.1-cudnn-runtime-ubuntu24.04 AS python-builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --no-cache-dir --break-system-packages \
+    opencv-python-headless \
     ultralytics \
     torch \
     torchvision \
     --extra-index-url https://download.pytorch.org/whl/cu126
 
-ENV YOLO_CONFIG_DIR=/tmp/yolo_config
-RUN mkdir -p /tmp/yolo_config/Ultralytics /opt/yolo_models && \
-    chmod -R 777 /tmp/yolo_config && \
-    python3 -c "
-from ultralytics import YOLO; import shutil
-m = YOLO('yolo11n.pt')
-shutil.copy(m.ckpt_path, '/opt/yolo_models/yolo11n.pt')
-"
+RUN mkdir -p /opt/yolo_models && \
+    curl -L -o /opt/yolo_models/yolo11n.pt \
+    https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11n.pt
 
 # ── Stage 2: ROS workspace build ──────────────────────────────────────────────
 FROM docker.io/library/ros:kilted-ros-base AS ros-builder
