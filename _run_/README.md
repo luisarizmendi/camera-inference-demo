@@ -28,45 +28,20 @@ ls /dev/video*
 
 ### 3. Ensure the camera device is accessible
 
-The `camera-gateway-rtsp` container requires read/write access to `/dev/video0` from the user running the container.
-
-**On Fedora desktop** this works automatically — `systemd-logind` grants the logged-in user an ACL on every `/dev/video*` device at login.
-
-**On RHEL, CentOS Stream, or any headless/embedded system** (e.g. NVIDIA Jetson) this automatic ACL is not applied. You will see:
-
-```
-[WARNING] Cannot read /dev/video0 — permission denied.
-```
-
-even when using `--device /dev/video0` and `--group-add video`.
-
-**Fix — run this once and it survives reboots:**
+The container needs read/write access to the camera device (e.g. `/dev/video0`). The user running the container must be a member of the `video` group:
 
 ```bash
-sudo tee /etc/systemd/system/camera-acl.service <<'EOF'
-[Unit]
-Description=Set camera device ACL for the container user
-After=systemd-udev-settle.service
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/setfacl -m u:YOUR_USER:rw /dev/video0
-ExecStart=/usr/bin/setfacl -m u:YOUR_USER:rw /dev/video1
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl enable --now camera-acl.service
+sudo usermod -aG video $USER
+# Log out and back in for the group change to take effect, then verify:
+id $USER | grep video
 ```
 
-Replace `YOUR_USER` with the user that will run the container. Verify it worked:
+Pass the device and group when running the container:
 
 ```bash
-getfacl /dev/video0   # must show:  user:YOUR_USER:rw-
+--device /dev/video0 \
+--group-add $(getent group video | cut -d: -f3)
 ```
-
-See [`camera-gateway-rtsp/README.md`](../camera-gateway-rtsp/README.md#camera-device-permissions) for full background and alternative approaches.
 
 ---
 

@@ -19,7 +19,7 @@ camera-gateway-rtsp/
 
 ## How it works
 
-`entrypoint.sh` starts MediaMTX, waits for the RTSP port to be ready, then runs `stream.py`. The script probes `/dev/video*` devices, picks the first working webcam, and streams it to MediaMTX via FFmpeg. If no camera is found it falls back to looping video files from `VID_DIR`.
+`entrypoint.sh` starts MediaMTX, waits for the RTSP port to be ready, then runs `stream.py`. The script probes `/dev/video*` devices, enumerates all supported format/resolution/fps combinations via `v4l2-ctl --list-formats-ext`, and selects the best mode: it targets 30 fps (configurable via `CAM_TARGET_FPS`), picks the closest available fps, and among equally-close options prefers the largest resolution. If no camera is found it falls back to looping video files from `VID_DIR`.
 
 The base image is Fedora latest with FFmpeg from RPM Fusion.
 
@@ -68,8 +68,9 @@ podman build -t camera-gateway-rtsp:latest src/
 
 | Variable            | Default       | Description |
 |---------------------|---------------|-------------|
-| `CAM_FRAMERATE`     | `30`          | Capture framerate |
-| `CAM_RESOLUTION`    | _(auto)_      | Resolution, e.g. `1280x720`, empty means camera default |
+| `CAM_TARGET_FPS`    | `30`          | Desired capture framerate. The script selects the closest fps the camera supports, preferring larger resolutions on a tie. |
+| `CAM_FRAMERATE`     | _(auto)_      | Override: force a specific framerate, skipping auto-selection |
+| `CAM_RESOLUTION`    | _(auto)_      | Override: force a specific resolution (e.g. `1280x720`), skipping auto-selection |
 | `CAM_VIDEO_CODEC`   | `libx264`     | FFmpeg video codec |
 | `CAM_VIDEO_BITRATE` | `600k`        | Video bitrate |
 | `CAM_AUDIO_CODEC`   | `libopus`     | Audio codec |
@@ -104,75 +105,20 @@ podman build -t camera-gateway-rtsp:latest src/
 
 ## Camera device permissions
 
-The container needs read/write access to `/dev/video0` (or whichever `/dev/video*` node your camera appears as) on the host.
-
-### Why it works on Fedora but not on RHEL / headless systems
-
-On a Fedora desktop `systemd-logind` automatically sets a POSIX ACL that grants the locally logged-in user direct access to every `/dev/video*` device:
-
-```
-user:youruser:rw-   ← added automatically by logind
-```
-
-On RHEL, CentOS Stream, or any headless system (including an NVIDIA Jetson) this automatic ACL is never applied, so even with `--device /dev/video0` and `--group-add video` the container process gets a `permission denied` error:
-
-```
-[WARNING] Cannot read /dev/video0 — permission denied.
-```
-
-### Diagnosing the problem
+The container needs read/write access to the camera device (e.g. `/dev/video0`). The user running the container must be a member of the `video` group:
 
 ```bash
-# Check whether your user already has an ACL entry:
-getfacl /dev/video0
-
-# Check the GID that owns the device:
-ls -la /dev/video0
-
-# Check whether the video group exists locally:
-getent group video
-grep video /etc/group   # empty output = managed by SSSD/LDAP
+sudo usermod -aG video $USER
+# Log out and back in for the group change to take effect, then verify:
+id $USER | grep video
 ```
 
-### Permanent fix — systemd service (works in all cases, no re-login needed)
+Pass the device and group when running the container:
 
 ```bash
-sudo tee /etc/systemd/system/camera-acl.service <<'EOF'
-[Unit]
-Description=Set camera device ACL for the container user
-After=systemd-udev-settle.service
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/setfacl -m u:YOUR_USER:rw /dev/video0
-ExecStart=/usr/bin/setfacl -m u:YOUR_USER:rw /dev/video1
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl enable --now camera-acl.service
-
-# Verify
-getfacl /dev/video0   # must show user:YOUR_USER:rw-
+--device /dev/video0 \
+--group-add $(getent group video | cut -d: -f3)
 ```
-
-Replace `YOUR_USER` with the actual user running the container. Add or remove `ExecStart` lines to match your `/dev/video*` devices.
-
-### Alternative fix — add the user to the video group
-
-```bash
-# Works only if the video group is local (appears in /etc/group):
-sudo usermod -aG video YOUR_USER
-# Log out and back in, then verify:
-id YOUR_USER | grep video
-```
-
-> If the `video` group is absent from `/etc/group` (managed by SSSD/LDAP), you cannot add local users to it — use the systemd service fix above instead.
-
-### Why udev RUN+= rules do not work here
-
-A `udev` rule with `RUN+="/usr/bin/setfacl ..."` looks attractive but on systems with SELinux enforcing (RHEL default) the udev worker process is denied the `setfacl` call and the rule silently does nothing. A systemd `oneshot` service runs in a less restricted SELinux context and is the reliable alternative.
 
 ## Run (standalone)
 
@@ -183,8 +129,7 @@ podman run --rm \
   --security-opt label=disable \
   --group-add $(getent group video | cut -d: -f3) \
   -e MTX_WEBRTCADDITIONALHOSTS=192.168.1.41 \
-  -e CAM_FRAMERATE=30 \
-  -e CAM_RESOLUTION=1280x720 \
+  -e CAM_TARGET_FPS=30 \
   quay.io/luisarizmendi/camera-gateway-rtsp:latest
 ```
 
