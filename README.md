@@ -1,6 +1,6 @@
-# Camera Inference Demo
+# RTSP$Camera Inference Demo with ROS
 
-Low-latency camera streaming with YOLOv11 object detection and live bounding-box overlay in the browser.
+Low-latency RTSP camera streaming with YOLOv11 object detection and live bounding-box overlay in the browser using Robot Opereating System.
 
 ## Goal
 
@@ -51,7 +51,7 @@ Video and detections reach the browser on independent paths and are composited c
 ## Repository layout
 
 ```
-camera-inference-demo/
+camera-inference-rtsp-ros/
 ├── README.md                        <- this file
 ├── build-all.sh                     <- build every image in one command
 |
